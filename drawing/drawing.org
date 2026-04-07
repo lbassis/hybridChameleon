@@ -1,0 +1,252 @@
+* Default style
+#+begin_src R :results output :session *R* :exports both
+meu_estilo <- function(pos) {
+     list(
+       theme_bw(base_size = 14),
+       theme(
+         legend.title = element_blank(),
+         plot.margin = unit(c(0, 0, 0, 0), "cm"),
+         legend.spacing = unit(1, "mm"),
+         legend.position = "inside",
+         legend.position.inside = pos,
+         legend.justification = "left",
+         legend.box.spacing = unit(0, "pt"),
+         legend.box.margin = margin(0, 0, 0, 0),
+         axis.text.x = element_text(angle=90, vjust=1, hjust=1)    
+       ))
+    }
+#+end_src
+
+#+RESULTS:
+
+* Schedulers
+#+begin_src R :results output :session *R* :exports both
+library(dplyr)
+library(ggplot2)
+library(paletteer)
+
+df <- read.csv("./drawing/sched_complete.csv", sep=';')
+
+label_func <- c('Without GPU', 'With GPU')
+names(label_func) <- c(0, 1)
+
+
+df$cpu = factor(df$cpu, levels=c('Xeon', 'i9'))
+df$model_based <- ifelse(grepl('dm', df$sched), 'Model-based', 'No model')
+
+df |>
+  group_by(threads, gpus, sched, model_based, cpu,) |>
+  summarise(avg_gflops=mean(gflops), count = n(), sd = sd(gflops), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=sched, y=avg_gflops, fill=model_based, ymin = avg_gflops - se, ymax = avg_gflops + se)) +
+  geom_bar(stat='identity') +
+  geom_errorbar(width=.8) +
+  labs(x="Scheduling policy", y="Average GFLOPs") +
+  facet_grid(gpus~cpu, labeller=labeller(gpus=label_func), scale='free_y') +
+  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  meu_estilo(c(0.28,0.85)) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    text = element_text(size = 18)
+    ) -> plot
+
+ggsave('drawing/sched_complete.pdf', width=10, height=5, plot)
+#+end_src
+
+#+RESULTS:
+: [1m[22m`summarise()` has grouped output by 'threads', 'gpus', 'sched', 'model_based'. You can override using
+: the `.groups` argument.
+* Logical cores
+#+begin_src R :results output :session *R* :exports both
+library(dplyr)
+library(ggplot2)
+library(paletteer)
+
+df <- read.csv("./drawing/logical_complete.csv", sep=';')
+
+label_func <- c('Without GPU', 'With GPU')
+names(label_func) <- c(0, 1)
+
+df$cpu = factor(df$cpu, levels=c('Xeon', 'i9'))
+df$thread_nature = ifelse(df$threads == 7 | df$threads == 8 | df$threads == 23 | df$threads == 24, 'Only physical', 'Physical + Logical')
+
+df |>
+  group_by(thread_nature, nb, cpu, gpus,) |>
+  summarise(avg_gflops=mean(gflops), count = n(), sd = sd(gflops), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=nb, y=avg_gflops, color=thread_nature, ymin = avg_gflops - se, ymax = avg_gflops + se)) +
+  geom_point(size=3.5, position=position_dodge(width = 50)) +
+  geom_errorbar(width=70, position=position_dodge(width = 50)) +
+  geom_line(linetype='dashed') +
+  labs(x="Tile size", y="Average GFLOPs") +
+  ggh4x::facet_grid2(gpus~cpu, scales='free', independent='y', labeller=labeller(gpus=label_func)) +
+  scale_color_paletteer_d("nationalparkcolors::Badlands") +
+  scale_x_discrete(limits=c(320, 512, 1024, 1625, 2048)) +
+  meu_estilo(c(0.88,0.85)) +
+  theme(
+    text = element_text(size = 15),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    panel.spacing = unit(2, "lines")
+    ) -> plot
+
+ggsave('./drawing/logical_complete.pdf', width=10, height=5, plot)
+#+end_src
+
+#+RESULTS:
+: [1m[22m`summarise()` has grouped output by 'thread_nature', 'nb', 'cpu'. You can override using the `.groups`
+: argument.
+: Warning message:
+: In scale_x_discrete(limits = c(320, 512, 1024, 1625, 2048)) :
+:   [1m[22mContinuous limits supplied to discrete scale.
+: [36mℹ[39m Did you mean `limits = factor(...)` or `scale_*_continuous()`?
+* Heterogeneous x homogeneous models
+#+begin_src R :results output :session *R* :exports both
+library(dplyr)
+library(ggplot2)
+library(paletteer)
+
+df <- read.csv("./drawing/heterogeneity.csv", sep=";")
+
+df$core = factor(df$core)
+df$mean = df$mean..us.or.J
+df$dev = df$dev..us.or.J
+
+dgemm_homo_mean <- 3.428302e+03
+dgemm_homo_dev <- 4.087326e+02
+
+dgetrf_homo_mean <- 1.626371e+03
+dgetrf_homo_dev <- 1.449537e+02
+
+dtrsm_homo_mean <- 2.118462e+03
+dtrsm_homo_dev  <- 2.502820e+02
+
+
+colors <- c('#5495CFFF', '#F5AF4DFF', '#DB4743FF', '#7C873EFF', '#5495CFFF', '#F5AF4DFF', '#DB4743FF', '#7C873EFF')
+df |>
+  filter(op != 'dplgsy') |>
+  ggplot(aes(x=core, y=mean, color=op, ymin=mean+dev, ymax=mean-dev)) +
+  geom_point(size=3) +
+  geom_errorbar(width=.3) +
+  geom_hline(show.legend=FALSE, aes(yintercept=dgemm_homo_mean), linetype="dashed", color='#5495CFFF') +
+  geom_hline(show.legend=FALSE, aes(yintercept=dgetrf_homo_mean), linetype="dashed", color='#F5AF4DFF') +
+  geom_hline(show.legend=FALSE, aes(yintercept=dtrsm_homo_mean), linetype="dashed", color='#DB4743FF') +
+  scale_color_manual(values=colors) +
+  labs(x="Core ID", y="Average execution time (us)") +
+  ylim(0, NA) +
+  meu_estilo(c(0,0)) +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0)) -> plot
+
+label_func <- c('LU', 'Cholesky')
+names(label_func) <- c('dgetrf_nopiv', 'dpotrf')
+
+df2 <- read.csv("./drawing/hetero_perf.csv", sep=";")
+
+df2$config = ifelse(df2$config == 1, 'Homogeneous Cores', 'Heterogeneous Cores')
+
+df2$config = factor(df2$config, levels=c('Homogeneous Cores', 'Heterogeneous Cores'))
+
+df2 |>
+  group_by(Function, config) |>
+  summarise(avg_time=mean(time), count = n(), sd = sd(time), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=config, y=avg_time, fill=config, ymin = avg_time - se, ymax = avg_time + se)) +
+  coord_flip() +
+  geom_bar(stat='identity') +
+  geom_errorbar(width=.7) +
+  labs(x="Performance Models Approach", y="Average Execution time (s)") +
+  facet_grid(Function~., scale='free_y', labeller=labeller(Function=label_func)) +
+  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  meu_estilo(c(0.28,0.85)) +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    axis.text.x = element_text(angle=0, vjust=1, hjust=1)    
+    ) -> perf_plot
+
+ggsave('./drawing/hetero_perf.pdf', width=10, height=4, perf_plot)
+ggsave('./drawing/hetero_complete.pdf', width=10, height=5, plot)
+#+end_src
+
+#+RESULTS:
+: [1m[22m`summarise()` has grouped output by 'Function'. You can override using the `.groups` argument.
+* CUDA 
+#+begin_src R :results output :session *R* :exports both
+library(dplyr)
+library(ggplot2)
+library(paletteer)
+
+df <- read.csv("./drawing/i9_cuda_complete.csv", sep=';')
+
+df$cuda = factor(df$cuda, levels=c('No CUDA Core', 'CUDA E-Core', 'CUDA P-Core'))
+label_func <- c('LU', 'Cholesky')
+names(label_func) <- c('dgetrf_nopiv', 'dpotrf')
+
+df |>
+  group_by(Function, cuda) |>
+  summarise(avg_time=mean(time), count = n(), sd = sd(time), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=cuda, y=avg_time, fill=cuda, ymin = avg_time - se, ymax = avg_time + se)) +
+  coord_flip() +
+  geom_bar(stat='identity') +
+  geom_errorbar(width=.9) +
+  labs(x="CUDA Core Allocatoin", y="Average Execution time (s)") +
+  facet_grid(Function~., scale='free_y', labeller=labeller(Function=label_func)) +
+  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  meu_estilo(c(0.28,0.85)) +
+  theme(
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    axis.text.x = element_text(angle=0, vjust=1, hjust=1)    
+    ) -> plot
+
+ggsave('./drawing/cuda_complete.pdf', width=10, height=4, plot)
+#+end_src
+
+#+RESULTS:
+: [1m[22m`summarise()` has grouped output by 'Function'. You can override using the `.groups` argument.
+* i7 Tile size
+#+begin_src R :results output :session *R* :exports both
+library(dplyr)
+library(ggplot2)
+library(paletteer)
+
+df <- read.csv("./drawing/i7_tile_complete.csv", sep=';')
+
+label_func <- c('Without GPU', 'With GPU')
+names(label_func) <- c(0, 1)
+
+df |>
+  group_by(Function, threads, nb, gpus) |>
+  summarise(avg_gflops=mean(gflops), count = n(), sd = sd(gflops), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=nb, y=avg_gflops, color=Function, ymin = avg_gflops - se, ymax = avg_gflops + se)) +
+  geom_point(size=3.) +
+  geom_errorbar(width=90) +
+  geom_line(linetype='dashed') +
+  labs(x="Tile size", y="Average GFLOPs") +
+  facet_wrap(~gpus, labeller=labeller(gpus=label_func)) +
+  scale_color_paletteer_d("nationalparkcolors::Badlands") +
+  meu_estilo(c(0.88,0.85)) +
+  ylim(0, NA) +
+  scale_x_continuous(limits=c(0, 2100), breaks=c(0, 320, 512, 1024, 1625, 2048)) +
+  coord_cartesian(clip = "off") +
+  theme(
+   text = element_text(size = 18),
+   legend.position = "top",
+   legend.justification="center",
+   legend.box.margin = margin(0, 0, 1, 0),
+   axis.text.x = element_text(angle=0, vjust=1, hjust=1),
+   plot.margin = unit(c(0,.4,0,0), "cm")) -> plot
+
+ggsave('./drawing/i7_tile_complete.pdf', width=10, height=5, plot)
+#+end_src
+
+#+RESULTS:
+: [1m[22m`summarise()` has grouped output by 'Function', 'threads', 'nb'. You can override using the `.groups`
+: argument.

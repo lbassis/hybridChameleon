@@ -1,0 +1,45 @@
+* Schedulers
+#+begin_src bash
+echo "Function;threads;gpus;nb;n;time;gflops;sched;cpu" > sched_complete.csv
+
+cat xeon_schedulers.ou | grep -e "potrf;" -e "getrf_nopiv;" -e ";eager" -e ";ws" -e ";lws" -e ";prio" -e ";heteroprio" -e ";dm*"| paste -d ""  - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,8,10,14,15,16 | sed 's/$/;Xeon/g' >> sched_complete.csv
+cat i9_schedulers.ou | grep -e "potrf;" -e "getrf_nopiv;" -e ";eager" -e ";ws" -e ";lws" -e ";prio" -e ";heteroprio" -e ";dm*"| paste -d ""  - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,8,10,14,15,16 | sed 's/$/;i9/g' >> sched_complete.csv
+#+end_src
+
+* Logical cores
+#+begin_src bash
+echo "Function;threads;gpus;nb;n;time;gflops;sched;cpu" > logical_complete.csv
+
+cat xeon_virtual.ou | grep -e "potrf;" -e "getrf_nopiv;" -e ";heteroprio" -e ";dmdas"| paste -d ""  - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,8,10,14,15,16 | sed 's/$/;Xeon/g' >> logical_complete.csv
+cat i9_virtual.ou | grep -e "potrf;" -e "getrf_nopiv;" -e ";heteroprio" -e ";dmdas"| paste -d ""  - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,8,10,14,15,16 | sed 's/$/;i9/g' >> logical_complete.csv
+#+end_src
+
+* Heterogeneous x homogeneous models
+This one requires you to move to the codelets folder where the performance models are stored
+
+#+begin_src bash
+echo "core;hash;size;flops;mean..us.or.J;dev..us.or.J;sum;sum2;n;op" > heterogeneity.csv
+
+cat dgemm.tupi4 | grep -e "Model for" -e "2457600" | sed -E 's/\# Model for (cpu[0-9]+)_impl[0-9]+.*/\1/g' |  paste -d "\t"  - - | sed 's/\t/;/g' | sed 's/ //g' | sed 's/cpu//g' | sed 's/$/;gemm/g' >> heterogeneity.csv
+cat dgetrf_nopiv.tupi4 | grep -e "Model for" -e "819200" | sed -E 's/\# Model for (cpu[0-9]+)_impl[0-9]+.*/\1/g' |  paste -d "\t"  - - | sed 's/\t/;/g' | sed 's/ //g' | sed 's/cpu//g' | sed 's/$/;getrf_nopiv/g' >> heterogeneity.csv
+cat dtrsm.tupi4 | grep -e "Model for" -e "1638400" | sed -E 's/\# Model for (cpu[0-9]+)_impl[0-9]+.*/\1/g' |  paste -d "\t"  - - | sed 's/\t/;/g' | sed 's/ //g' | sed 's/cpu//g' | sed 's/$/;trsm/g' >> heterogeneity.csv
+cat dplgsy.tupi4 | grep -e "Model for" -e "819200" | sed -E 's/\# Model for (cpu[0-9]+)_impl[0-9]+.*/\1/g' |  paste -d "\t"  - - | sed 's/\t/;/g' | sed 's/ //g' | sed 's/cpu//g' | sed 's/$/;plgsy/g' >> heterogeneity.csv
+#+end_src
+
+#+begin_src bash
+echo "Function;threads;gpus;time;gflops;config" > hetero_perf.csv
+
+cat i9_heterogeneity_2.ou | grep -e "potrf;" -e "getrf_nopiv;" -e ";0" -e ";1" | paste -d ""  - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,14,15,16 >> hetero_perf.csv
+#+end_src
+* CUDA
+#+begin_src bash
+echo "Function;threads;gpus;nb;n;time;gflops;cuda" > i9_cuda_complete.csv
+
+cat i9_cuda.ou | grep -e "potrf;" -e "getrf_nopiv;" -e ";nocuda" -e ";ecore" -e ";pcore" | paste -d ""  - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,8,10,14,15,16 | sed 's/nocuda/No CUDA Core/g' | sed 's/ecore/CUDA E-Core/g' | sed 's/pcore/CUDA P-Core/g' >> i9_cuda_complete.csv
+#+end_src
+* i7 Tile size
+#+begin_src bash
+echo "Function;threads;gpus;nb;n;time;gflops" > i7_tile_complete.csv
+
+cat i7_tile.ou | grep -e "potrf;" -e "getrf_nopiv;" | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,8,10,14,15,16 >> i7_tile_complete.csv
+#+end_src
