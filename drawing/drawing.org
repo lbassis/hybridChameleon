@@ -250,3 +250,491 @@ ggsave('./drawing/i7_tile_complete.pdf', width=10, height=5, plot)
 #+RESULTS:
 : [1m[22m`summarise()` has grouped output by 'Function', 'threads', 'nb'. You can override using the `.groups`
 : argument.
+* Methodology (default x optimized)
+#+begin_src R :results output :session *R* :exports both
+library(dplyr)
+library(ggplot2)
+library(paletteer)
+
+df <- read.csv("./drawing/methodology_complete.csv", sep=';')
+df$config = ifelse(df$config == 'optimal', 'Optimized', 'Default')
+
+# remove first occurrence
+df |> group_by(Function, cpu, config, gpus) |> slice(0:(n()-1)) |> ungroup() -> df
+
+label_func <- c('LU', 'Cholesky')
+names(label_func) <- c('dgetrf_nopiv', 'dpotrf')
+
+df |>
+  filter(gpus == 0) |>
+  group_by(Function, cpu, config) |>
+  summarise(avg_t=mean(time), count = n(), sd = sd(time), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=interaction(Function, config, cpu), y=avg_t, fill=config, ymin = avg_t - se, ymax = avg_t + se)) +
+  coord_flip() +
+  geom_bar(stat='identity') +
+  geom_errorbar(width=.8) +
+  labs(x="Experiment", y="Average execution time (s)") +
+  facet_grid(Function~., scales='free_y', labeller=labeller(Function=label_func)) +
+  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  meu_estilo(c(0.28,0.85)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=1),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_cpu
+
+df |>
+  filter(gpus == 1) |>
+  group_by(Function, cpu, config) |>
+  summarise(avg_t=mean(time), count = n(), sd = sd(time), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=interaction(Function, config, cpu), y=avg_t, fill=config, ymin = avg_t - se, ymax = avg_t + se)) +
+  coord_flip() +
+  geom_bar(stat='identity') +
+  geom_errorbar(width=.8) +
+  labs(x="Experiment", y="Average execution time (s)") +
+  facet_grid(Function~., scales='free_y', labeller=labeller(Function=label_func)) +
+  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  meu_estilo(c(0.28,0.85)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=1),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_gpu
+
+ggsave('./drawing/methodology_cpu.pdf', width=10, height=5, plot_cpu)
+ggsave('./drawing/methodology_gpu.pdf', width=10, height=5, plot_gpu)
+#+end_src
+
+#+RESULTS:
+: [1m[22m`summarise()` has grouped output by 'Function', 'cpu'. You can override using the `.groups` argument.
+: [1m[22m`summarise()` has grouped output by 'Function', 'cpu'. You can override using the `.groups` argument.
+
+* ABE
+#+begin_src R :results output :session *R* :exports both
+library(dplyr)
+library(ggplot2)
+library(paletteer)
+
+df <- read.csv("./drawing/abe.csv")
+df$config = ifelse(df$config == 'optimal', 'Optimized', 'Default')
+
+colors <- c('#5495CFFF', '#F5AF4DFF', '#DB4743FF', '#7C873EFF', '#FDE9AC')
+
+label_func <- c('LU Factorization', 'Cholesky Factorization')
+names(label_func) <- c('dgetrf_nopiv', 'dpotrf')
+
+df |> 
+  filter(gpus == 0) |>
+  ggplot(aes(x=interaction(Function,config,cpu), y=mean_makespan, ymin=mean_abe, ymax=mean_abe, fill=config)) +
+  geom_bar(stat='identity') +
+  geom_errorbar(color='white') +
+  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  coord_flip() + 
+  facet_grid(Function~., scale='free_y', labeller=labeller(Function=label_func)) +
+  labs(y='Average execution time (s)', x='Experiment') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_cpu
+
+df |> 
+  filter(gpus == 1) |>
+  ggplot(aes(x=interaction(Function,config,cpu), y=mean_makespan, ymin=mean_abe, ymax=mean_abe, fill=config)) +
+  geom_bar(stat='identity') +
+  geom_errorbar(color='white') +
+  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  coord_flip() + 
+  facet_grid(Function~., scale='free_y', labeller=labeller(Function=label_func)) +
+  labs(y='Average execution time (s)', x='Experiment') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_gpu
+
+ggsave('./drawing/abe_cpu.pdf', width=10, height=5, plot_cpu)
+ggsave('./drawing/abe_gpu.pdf', width=10, height=5, plot_gpu)
+
+#+end_src
+* Performance
+#+begin_src R :results output :session *R* :exports both
+library(dplyr)
+library(ggplot2)
+library(paletteer)
+
+df <- read.csv("./drawing/final_gpu_complete.csv")
+
+colors <- c('#5495CFFF', '#F5AF4DFF', '#DB4743FF', '#7C873EFF', '#FDE9AC')
+
+# remove first occurrence
+df |> group_by(Function, cpu, config, gpus) |> slice(0:(n()-1)) |> ungroup() -> df
+
+# setting better strings
+df$config = ifelse(df$cpu == 'Xeon', 'All Cores', df$config)
+df$config = ifelse(df$config == 'pcores', 'Only P-Cores', df$config)
+df$config <- ifelse(df$config == 'ecores', 'Only E-Cores', df$config)
+df$config <- ifelse(df$config == 'allpcuda' & df$cpu == 'Xeon', 'All Cores', df$config)
+df$config <- ifelse(df$config == 'allpcuda' & df$cpu != 'Xeon' & df$gpus == 0, 'All Cores', df$config)
+df$config <- ifelse(df$config == 'allpcuda' & df$cpu != 'Xeon' & df$gpus == 1, 'All Cores & CUDA P-Core', df$config)
+df$config <- ifelse(df$config == 'allecuda', 'All Cores & CUDA E-Core', df$config)
+
+df$config <- factor(df$config, levels=c("All Cores", "Only E-Cores", "Only P-Cores", "All Cores & CUDA E-Core", "All Cores & CUDA P-Core"))
+
+label_func <- c('LU Factorization', 'Cholesky Factorization')
+names(label_func) <- c('dgetrf_nopiv', 'dpotrf')
+
+# no gpu
+df |> 
+  filter(gpus == 0) |>
+  group_by(cpu, config, gpus) |> 
+  summarise(avg_gflops=mean(gflops), count = n(), sd = sd(gflops), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=config, y=avg_gflops, ymin=avg_gflops-se, ymax=avg_gflops+se, fill=config)) +
+  geom_bar(stat='identity') +
+  geom_errorbar() +
+  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  coord_flip() + 
+  facet_grid(cpu~., scale='free_y', labeller=labeller(Function=label_func)) +
+  labs(y='Average GFLOPs', x='Core Selection') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    axis.ticks.y=element_blank(),
+    axis.text.y=element_blank(),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_perf_cpu
+
+df |> 
+  filter(gpus == 1) |>
+  group_by(cpu, config, gpus) |> 
+  summarise(avg_gflops=mean(gflops), count = n(), sd = sd(gflops), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=config, y=avg_gflops, ymin=avg_gflops-se, ymax=avg_gflops+se, fill=config)) +
+  geom_bar(stat='identity') +
+  geom_errorbar() +
+  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  coord_flip() + 
+  facet_grid(cpu~., scale='free_y', labeller=labeller(Function=label_func)) +
+  labs(y='Average GFLOPs', x='Core Selection') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    axis.ticks.y=element_blank(),
+    axis.text.y=element_blank(),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_perf_gpu
+
+ggsave('./drawing//final_perf_cpu.pdf', width=10, height=4, plot_perf_cpu)
+ggsave('./drawing//final_perf_gpu.pdf', width=10, height=4, plot_perf_gpu)
+#+end_src
+
+* Energy Consumption
+#+begin_src R :results output :session *R* :exports both
+library(dplyr)
+library(ggplot2)
+library(paletteer)
+
+df <- read.csv("./drawing/final_gpu_complete.csv")
+
+colors <- c('#5495CFFF', '#F5AF4DFF', '#DB4743FF', '#7C873EFF', '#FDE9AC')
+
+# remove first occurrence
+df |> group_by(Function, cpu, config, gpus) |> slice(0:(n()-1)) |> ungroup() -> df
+
+# setting better strings
+df$config = ifelse(df$cpu == 'Xeon', 'All Cores', df$config)
+df$config = ifelse(df$config == 'pcores', 'Only P-Cores', df$config)
+df$config <- ifelse(df$config == 'ecores', 'Only E-Cores', df$config)
+df$config <- ifelse(df$config == 'allpcuda' & df$cpu == 'Xeon', 'All Cores', df$config)
+df$config <- ifelse(df$config == 'allpcuda' & df$cpu != 'Xeon' & df$gpus == 0, 'All Cores', df$config)
+df$config <- ifelse(df$config == 'allpcuda' & df$cpu != 'Xeon' & df$gpus == 1, 'All Cores & CUDA P-Core', df$config)
+df$config <- ifelse(df$config == 'allecuda', 'All Cores & CUDA E-Core', df$config)
+
+df$config <- factor(df$config, levels=c("All Cores", "Only E-Cores", "Only P-Cores", "All Cores & CUDA E-Core", "All Cores & CUDA P-Core"))
+
+# cpu energy spent
+df |> 
+  filter(Function == 'dgetrf_nopiv' & gpus == 0) |>
+  group_by(cpu, config, gpus) |> 
+  summarise(avg_energy=mean(energy_spent), count = n(), sd = sd(energy_spent), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=config, y=avg_energy, ymin=avg_energy-se, ymax=avg_energy+se, fill=config)) +
+  geom_bar(stat='identity') +
+  geom_errorbar() +
+  scale_fill_manual(values=colors) +#  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  coord_flip() + 
+  facet_grid(cpu~., scale='free_y') +
+  labs(y='Energy Consumed (J)', x='Core Selection') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    axis.ticks.y=element_blank(),
+    axis.text.y=element_blank(),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_lu_cpu
+
+df |> 
+  filter(Function == 'dpotrf' & gpus == 0) |>
+  group_by(cpu, config, gpus) |> 
+  summarise(avg_energy=mean(energy_spent), count = n(), sd = sd(energy_spent), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=config, y=avg_energy, ymin=avg_energy-se, ymax=avg_energy+se, fill=config)) +
+  geom_bar(stat='identity') +
+  geom_errorbar() +
+  scale_fill_manual(values=colors) +#  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  coord_flip() + 
+  facet_grid(cpu~., scale='free_y') +
+  labs(y='Energy Consumed (J)', x='Core Selection') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    axis.ticks.y=element_blank(),
+    axis.text.y=element_blank(),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_cholesky_cpu
+
+label_func <- c('LU Factorization', 'Cholesky Factorization')
+names(label_func) <- c('dgetrf_nopiv', 'dpotrf')
+
+df |> 
+  filter(gpus == 0) |>
+  group_by(Function, cpu, config, gpus) |> 
+  summarise(avg_energy=mean(energy_spent), avg_t=mean(time)) |>
+  ggplot(aes(x=avg_t, y=avg_energy, color=cpu, shape=config, group=cpu)) +
+  geom_line(linetype='dashed') +
+  geom_point(size=5, stroke=2) +
+  scale_fill_manual(values=colors) +#  scale_color_paletteer_d("nationalparkcolors::Badlands") +
+  facet_grid(~Function, labeller=labeller(Function=label_func)) +
+  scale_shape(solid=FALSE) +
+  labs(x='Average execution time (s)', y='Average energy consumption (J)') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    text = element_text(size = 25),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.8,.5,0), "cm")) -> plot_time_cpu
+
+
+# when the gpu is involved there are better names
+df |> 
+  filter(Function == 'dgetrf_nopiv' & gpus == 1) |>
+  group_by(cpu, config, gpus) |> 
+  summarise(avg_energy=mean(energy_spent), count = n(), sd = sd(energy_spent), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=config, y=avg_energy, ymin=avg_energy-se, ymax=avg_energy+se, fill=config)) +
+  geom_bar(stat='identity') +
+  geom_errorbar() +
+  scale_fill_manual(values=colors) +
+  coord_flip() + 
+  facet_grid(cpu~., scale='free_y') +
+  labs(y='Energy Consumed (J)', x='Core Selection') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    axis.ticks.y=element_blank(),
+    axis.text.y=element_blank(),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_lu_gpu
+
+df |> 
+  filter(Function == 'dpotrf' & gpus == 1) |>
+  group_by(cpu, config, gpus) |> 
+  summarise(avg_energy=mean(energy_spent), count = n(), sd = sd(energy_spent), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=config, y=avg_energy, ymin=avg_energy-se, ymax=avg_energy+se, fill=config)) +
+  geom_bar(stat='identity') +
+  geom_errorbar() +
+  scale_fill_manual(values=colors) +
+  coord_flip() + 
+  facet_grid(cpu~., scale='free_y') +
+  labs(y='Energy Consumed (J)', x='Core Selection') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    axis.ticks.y=element_blank(),
+    axis.text.y=element_blank(),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_cholesky_gpu
+
+df |> 
+  filter(gpus == 1) |>
+  group_by(Function, cpu, config, gpus) |> 
+  summarise(avg_energy=mean(energy_spent), avg_t=mean(time)) |>
+  ggplot(aes(x=avg_t, y=avg_energy, color=cpu, shape=config, group=cpu)) +
+  geom_line(linetype='dashed') +
+  geom_point(size=5, stroke=2) +
+  scale_fill_manual(values=colors) +#  scale_color_paletteer_d("nationalparkcolors::Badlands") +
+  facet_grid(~Function, labeller=labeller(Function=label_func)) +
+  scale_shape(solid=FALSE) +
+  labs(x='Average execution time (s)', y='Average energy consumption (J)') +
+  meu_estilo(c(0,0)) +
+  guides(color = guide_legend(nrow = 2), shape = guide_legend(nrow=2)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    text = element_text(size = 25),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,2.5,.5,0), "cm")) -> plot_time_gpu
+
+
+# total energy
+
+df$total_energy <- df$energy_spent + df$energy_gpu
+
+df |> 
+  filter(Function == 'dgetrf_nopiv' & gpus == 1) |>
+  group_by(cpu, config, gpus) |> 
+  summarise(avg_energy=mean(total_energy), count = n(), sd = sd(total_energy), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=config, y=avg_energy, ymin=avg_energy-se, ymax=avg_energy+se, fill=config)) +
+  geom_bar(stat='identity') +
+  geom_errorbar(width=.7) +
+  scale_fill_manual(values=colors) +
+  coord_flip() + 
+  facet_grid(cpu~., scale='free_y') +
+  labs(y='Energy Consumed (J)', x='Core Selection') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    axis.ticks.y=element_blank(),
+    axis.text.y=element_blank(),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_total_lu
+
+df |> 
+  filter(Function == 'dpotrf' & gpus == 1) |>
+  group_by(cpu, config, gpus) |> 
+  summarise(avg_energy=mean(total_energy), count = n(), sd = sd(total_energy), se = 3*sd/sqrt(count)) |>
+  ggplot(aes(x=config, y=avg_energy, ymin=avg_energy-se, ymax=avg_energy+se, fill=config)) +
+  geom_bar(stat='identity') +
+  geom_errorbar(width=.7) +
+  scale_fill_manual(values=colors) +
+  coord_flip() + 
+  facet_grid(cpu~., scale='free_y') +
+  labs(y='Energy Consumed (J)', x='Core Selection') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    axis.ticks.y=element_blank(),
+    axis.text.y=element_blank(),
+    text = element_text(size = 18),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.4,0,0), "cm")) -> plot_total_cholesky
+
+df |> 
+  filter(gpus == 1) |>
+  group_by(Function, cpu, config, gpus) |> 
+  summarise(avg_energy=mean(total_energy), avg_t=mean(time)) |>
+  ggplot(aes(x=avg_t, y=avg_energy, color=cpu, shape=config, group=cpu)) +
+  geom_line(linetype='dashed') +
+  geom_point(size=5, stroke=2) +
+  scale_fill_manual(values=colors) +#  scale_color_paletteer_d("nationalparkcolors::Badlands") +
+  facet_grid(~Function, labeller=labeller(Function=label_func)) +
+  scale_shape(solid=FALSE) +
+  labs(x='Average execution time (s)', y='Average energy consumption (J)') +
+  meu_estilo(c(0,0)) +
+  guides(color = guide_legend(nrow = 2), shape = guide_legend(nrow=2)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    text = element_text(size = 25),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,2.5,.5,0), "cm")) -> plot_time_gpu_consumption
+
+
+
+
+ggsave('./drawing/final_lu_cpu.pdf', width=10, height=4, plot_lu_cpu)
+ggsave('./drawing/final_cholesky_cpu.pdf', width=10, height=4, plot_cholesky_cpu)
+ggsave('./drawing/final_time_cpu.pdf', width=16, height=5.5, plot_time_cpu)
+ggsave('./drawing/final_lu_gpu.pdf', width=10, height=4, plot_lu_gpu)
+ggsave('./drawing/final_cholesky_gpu.pdf', width=10, height=4, plot_cholesky_gpu)
+ggsave('./drawing/final_time_gpu.pdf', width=16, height=5.5, plot_time_gpu)
+
+ggsave('./drawing/lu_gpu_energy.pdf', width=10, height=4, plot_total_lu)
+ggsave('./drawing/cholesky_gpu_energy.pdf', width=10, height=4, plot_total_cholesky)
+ggsave('./drawing/final_time_gpu_consumption.pdf', width=16, height=5.5, plot_time_gpu_consumption)
+
+#+end_src
+
+* GFLOPS x J
+#+begin_src R :results output :session *R* :exports both
+library(dplyr)
+library(ggplot2)
+library(paletteer)
+
+df <- read.csv("./drawing/final_gpu_complete.csv")
+df$total_energy <- df$energy_spent + df$energy_gpu
+
+colors <- c('#5495CFFF', '#F5AF4DFF', '#DB4743FF', '#7C873EFF', '#FDE9AC')
+
+# remove first occurrence
+df |> group_by(Function, cpu, config, gpus) |> slice(0:(n()-1)) |> ungroup() -> df
+
+# setting better strings
+df$config = ifelse(df$cpu == 'Xeon', 'All Cores', df$config)
+df$config = ifelse(df$config == 'pcores', 'Only P-Cores', df$config)
+df$config <- ifelse(df$config == 'ecores', 'Only E-Cores', df$config)
+df$config <- ifelse(df$config == 'allpcuda' & df$cpu == 'Xeon', 'All Cores', df$config)
+df$config <- ifelse(df$config == 'allpcuda' & df$cpu != 'Xeon' & df$gpus == 0, 'All Cores', df$config)
+df$config <- ifelse(df$config == 'allpcuda' & df$cpu != 'Xeon' & df$gpus == 1, 'All Cores & CUDA P-Core', df$config)
+df$config <- ifelse(df$config == 'allecuda', 'All Cores & CUDA E-Core', df$config)
+
+df$config <- factor(df$config, levels=c("All Cores", "Only E-Cores", "Only P-Cores", "All Cores & CUDA E-Core", "All Cores & CUDA P-Core"))
+
+label_func <- c('Without GPU', 'With GPU')
+names(label_func) <- c(0, 1)
+
+# gflops x J
+df |> 
+  group_by(cpu, config, gpus) |> 
+  summarise(avg_energy=mean(total_energy), avg_gflops=mean(gflops), efficiency=avg_gflops/avg_energy) |>
+  select(cpu, config, gpus, efficiency) |>
+  ggplot(aes(x=cpu, y=efficiency, color=config)) +
+  geom_point(size=5, position=position_dodge(width = .5)) +
+  scale_shape(solid=FALSE) +
+  scale_color_manual(values=colors) +
+  facet_grid(~gpus, labeller=labeller(gpus=label_func)) +
+  labs(x='CPU', y='Efficiency (GFLOPs/J)') +
+  meu_estilo(c(0,0)) +
+  theme(
+    axis.text.x = element_text(angle=0, vjust=1, hjust=0),
+    text = element_text(size = 25),
+    legend.position = "top",
+    legend.justification="center",
+    legend.box.margin = margin(0, 0, 1, 0),
+    plot.margin = unit(c(0,.8,.5,0), "cm")) -> plot_efficiency
+
+ggsave('./drawing/efficiency.pdf', width=16, height=5, plot_efficiency)
+#+end_src

@@ -43,3 +43,608 @@ echo "Function;threads;gpus;nb;n;time;gflops" > i7_tile_complete.csv
 
 cat i7_tile.ou | grep -e "potrf;" -e "getrf_nopiv;" | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,8,10,14,15,16 >> i7_tile_complete.csv
 #+end_src
+* Methodology (default x optimized)
+#+begin_src bash
+echo "Function;threads;gpus;nb;n;time;gflops;config;cpu" > methodology_complete.csv
+
+cat xeon_methodology.ou | grep -e "potrf;" -e "getrf_nopiv;" -e ";default" -e ";optimal"| paste -d ""  - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,8,10,14,15,16 | sed 's/$/;Xeon/g' >> methodology_complete.csv
+cat i7_methodology.ou | grep -e "potrf;" -e "getrf_nopiv;" -e ";default" -e ";optimal"| paste -d ""  - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,8,10,14,15,16 | sed 's/$/;i7/g' >> methodology_complete.csv
+cat i9_methodology.ou | grep -e "potrf;" -e "getrf_nopiv;" -e ";default" -e ";optimal"| paste -d ""  - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,8,10,14,15,16 | sed 's/$/;i9/g' >> methodology_complete.csv
+#+end_src
+* ABE
+
+The ABE was calculated by calling StarVZ functions on the traces created by the experiments. The *xeon_abe.slurm*, *i7_abe.slurm* and *i9_abe.slurm* scripts were used to run experiments while generating their traces. 
+From that, the *generate_trace.slurm* script creates the StarVZ files with the ABE and makespan information we want, while applying the *starvz.yaml* file described below. 
+
+#+begin_src yaml
+# Default Configuration, Each yaml file can have multiple configurations
+default:
+  # Cosmetic only options:
+  base_size: 14 # Base size for Text
+  expand: 0.05 # Factor to Expand horizontaly the plots with blank content
+  idleness_factor: 5.5 # Resouces Idleness Text Size division Factor of base_size
+  idleness_all: TRUE # Show all Resouces idleness values
+  # time: deprecated option
+  guided:
+    active: TRUE # Phase2 flag to guided plot (compute ideal height)
+    agg_type_height: 20
+  title: # Overall Visualization Title
+    active: FALSE # Active with directory name as Title
+    height: 0.6 # Title Size
+  vanilla: # Options about X and Y axis title and values
+    vertical: FALSE # If True, Remove Y axis' title and values
+    horizontal: FALSE  # If True, Remove X axis' title and values
+  limits: # Set the time limits used
+    start: 0 # Initial Time
+    #end: 10000 # Final Time
+  #selected_nodes: ["1"] #Select only some nodes in some plots
+
+  # Visualizations in order of appearance
+  atree: # plot space/time tree structure computation
+    active: FALSE # Disable
+    step: 10 # Time step used for aggregation
+    height: 2 # Vertical Size in the final visualization
+    legend: TRUE # Show the plot's Legends
+    computation: # Show computation tasks in the tree nodes
+      active: FALSE # Enable
+      pruned: # Show computation tasks of the pruned nodes
+        active: FALSE # Enable
+    initialization: # Show initialization tasks in the tree nodes
+      active: FALSE # Enable
+    communication: # Show communication tasks in the tree nodes
+      active: FALSE # Enable
+    anomalies: # Show where in the tree the anomalies happened
+      active: FALSE # Enable
+
+  utiltreenode: # Plot of resource utilization by tree depth
+    active: FALSE # Disable
+    step: 10 # Time step used for aggregation
+    height: 2 # Vertical size for the plot
+
+  utiltreedepth: # Plot of resource utilization by tree node
+    active: FALSE # Disable
+    step: 10 # Time step used for aggregation
+    height: 2 # Vertical size for the plot
+    legend: TRUE # Show the plot's Legends
+
+  kiteration: # Visualization about application itarations
+    active: FALSE # Enable
+    legend: TRUE # Enable Legends
+    height: 2 # Vertical Size in the final visualization
+
+  st: # Application State Plot over resources
+    active: TRUE # Enable
+    cpb: FALSE # Show Critical Path Bound makespan metric
+    #height: 4 # Vertical Size in the final visualization
+    idleness: FALSE # Show resource idleness %
+    expand: 0.01 # Expand for y ggplot
+    labels: "ALL" # Labels of the Resources names (for st and starpu), "ALL" "1CPU_per_NODE" "1GPU_per_NODE"
+    legend: TRUE # Show the plot's Legends
+    makespan: TRUE # Show the application makespan
+    alpha: 0.25 # Alpha value to control transparency of tasks that are not outliers
+    outliers: TRUE # Differentiate outliers tasks
+    abe: # Show Abe makespan metric
+      active: TRUE # Enable
+      label: TRUE # Enable "ABE:" Label
+      text: TRUE # Enable the visual marking, with the value and label
+      size: 5 # the size of the ABE transparent marking
+    aggregation: # If enable, aggregates the visualization tasks inside a time step.
+      active: FALSE # Enable
+      method: "static" # Method Used for aggregation "static" / "dynamic" (For Worker aggregation) or "nodes" for node Aggregation
+      states: ["dgemm"] # Option for dynamic aggregation, Tasks for aggregation
+      step: 1000 # Time step used for aggregation
+    cpb_mpi: # Show Critical Path bound makespan considering MPI
+      active: FALSE # Enable
+      bandwidth:  # TODO
+      theoretical: # TODO
+      tile_size: # TODO
+    tasks: # Shows Tasks Dependencies
+      active: FALSE # Enable
+      levels: 10 # Max Number of Dependencies
+      list: ["600"] # List of Tasks Ids
+  summary_nodes: # Present ABE and Makespan per node(Usefull for large execs)
+    active: FALSE
+    legend: FALSE # Enable Legends
+    #height: 2 # Vertical Size in the final visualization
+  pmtool: # Create plots based on pmtool generated data
+    bounds: # Shows pmtool theoretical bounds
+      active: FALSE # Enable
+      label: TRUE # Bound name
+      alg: ["area", "cp"] # List of bounds to plot
+    state: # PMtool State Chart theoretical computed by shedule
+      active: FALSE # Enable
+      height: 4 # Vertical Size in the final visualization
+      sched: "dmdas:" # Scheduler Used
+    kiteration: # Iteration Chart
+      active: FALSE
+      height: 2
+      middlelines: [0.5, 0.7] # Use middle lines in the plot to show advancement
+      pernode: FALSE # very experimental, per-node limits, do a facet_wrap(~Node, ncol=1)
+      legend: TRUE
+
+  memory:
+    combined: FALSE
+    state:
+      active: FALSE
+      border: FALSE
+      height:
+      total: TRUE
+      select: "Allocating"
+      #depth: deprecated
+      #  active: deprecated
+      #  height: deprecated
+    transfers:
+      active: FALSE
+      total: TRUE
+      height: 2 # Vertical Size in the final visualization
+      arrow: TRUE
+      border: TRUE
+
+  starpu:
+    active: TRUE
+    legend: TRUE
+    height:
+
+  ready:
+    active: TRUE
+    height: 2
+    legend: TRUE
+    limit:
+    step:
+
+  lackready:
+    active: FALSE
+    aggregation: 10
+    height: 0.3
+    threshold:
+
+  usedmemory:
+    active: FALSE
+    height:
+    legends:
+
+  imbalance:
+    active: FALSE
+    legend: FALSE
+    height: 1.1
+    limit:
+    step: 100
+
+  power_imbalance:
+    active: FALSE
+    legend: FALSE
+    height: 1.1
+    task: "dgemm"
+    limit:
+    step: 100
+
+  hete_imbalance:
+    active: FALSE
+    legend: FALSE
+    height: 1.1
+    limit:
+    step: 100
+
+  utilheatmap:
+    active: FALSE
+    legend: FALSE
+    height: 4
+    limit:
+    step: 100
+
+  submitted:
+    active: TRUE
+    legend: TRUE
+    height: 1.1
+    limit:
+    step:
+
+  mpibandwidth:
+    active: FALSE
+    step: 100
+    legend: FALSE
+    height: 1.1
+    limit:
+
+  mpiconcurrent:
+    active: FALSE
+    legend: FALSE
+    height: 1.5
+    step:
+    limit:
+
+  mpiconcurrentout:
+    active: FALSE
+    legend: FALSE
+    height: 1.5
+    step:
+    limit:
+
+  mpistate:
+    active: FALSE
+    legend: TRUE
+    height: 1.5
+    labels: "ALL"
+
+  gpubandwidth:
+    active: FALSE
+    bound:
+    height:
+    legend: TRUE
+    step: 85
+    total: TRUE
+
+  activenodes: # Plot the active node count over time
+    active: FALSE # Enable
+    height: 2 # Vertical size for the plot
+    legend: TRUE # Enable/Disable legend
+    aggregation: # If enable, aggregates the visualization tasks inside a time step.
+      active: TRUE # Enable
+      step: 10 # Time step used for aggregation
+    nodememuse: # Plot the memory usage for qr_mumps
+      active: FALSE # Enable
+      height: 2 # Vertical size for the plot
+      legend: TRUE # Enable/Disable legend
+
+  gflops:
+    active: FALSE
+    facet: TRUE
+    height:
+    legend:
+    limit:
+    step:
+  vertical_lines:
+    active: FALSE
+    x_list: [1, 2]
+    color_list: ["green", "gray"]
+#+end_src
+
+After that, the csv file can be built by using the following R script, with the proper directories set:
+
+#+begin_src R :results output :session *R* :exports both
+  library(tidyverse)
+  library(magrittr)
+  library(arrow)
+  library(starvz)
+  library(fs)
+  library(patchwork)
+
+      abe_cpu_cuda <- function(dfl, debug = FALSE) {
+        result <- abe_cpu_cuda_inner(dfl, debug)
+        ret <- result %>% pull(.data$Result)
+        return(tibble(Result = ret[[1]]$objval))
+      }
+      
+      abe_cpu_cuda_details <- function(dfl, Colors = NULL, debug = FALSE) {
+        node <- dfl %>%
+          slice(1) %>%
+          pull(.data$Node)
+        lpresult <- abe_cpu_cuda_inner(dfl, debug)
+      
+        # Extract the solution from the LP
+        lpresult %>% pull(.data$Result) -> result
+        lpresult %>%
+          select("Types", "Values") %>%
+          unnest(cols = c("Types")) %>%
+          unnest(cols = c("Values")) %>%
+          mutate(
+            Count = result[[1]]$solution[1:n()],
+            Estimation = TRUE
+          ) %>%
+          rename(
+            ResourceType = "Types",
+            Value = "Values"
+          ) -> ret
+      
+        # Get the actual counts and merge everything together
+        dfl %>%
+          mutate(ResourceType = as.character(.data$ResourceType)) %>%
+          group_by(.data$ResourceType, .data$Value) %>%
+          summarize(Count = n(), .groups="drop") %>%
+          mutate(Estimation = FALSE) %>%
+          bind_rows(ret) -> ret
+      
+        ret %>%
+          left_join(Colors, by = c("Value" = "Value")) -> ret
+      
+        return(ret)
+      }
+      
+      abe_cpu_cuda_inner <- function(dfl, debug = FALSE) {
+        columnNames <- c("Node", "Resource", "ResourceType", "Value", "Duration")
+        if (!all(columnNames %in% names(dfl))) {
+          print(paste("Obligatory columns names not present. They are ", columnNames))
+          return(NULL)
+        }
+      
+        #############
+        # Input Section
+      
+        # The amount of nodes
+        nnodes <- dfl %>%
+          select("Node") %>%
+          unique() %>%
+          .$Node %>%
+          sort() %>%
+          length()
+        # The amount of resources
+        df1.res_quantity <- dfl %>%
+          select("Node", "Resource", "ResourceType") %>%
+          unique() %>%
+          group_by(.data$ResourceType) %>%
+          summarize(Quantity = n(), .groups="drop")
+      
+        # The mean duration of each task per resource
+        df1.num_mean <- dfl %>%
+          group_by(.data$ResourceType, .data$Value) %>%
+          summarize(Num = n(), Mean = mean(.data$Duration), .groups="drop") %>%
+          as.data.frame()
+      
+        if (debug) {
+          print("ABE: Inicial metrics (v1)")
+          print(nnodes)
+          print(df1.res_quantity)
+          print(df1.num_mean)
+        }
+      
+        #############
+        # Derived variables
+      
+        # Initial parameters simplification
+        values <- df1.num_mean %>%
+          select("Value") %>%
+          arrange(.data$Value) %>%
+          .$Value %>%
+          unique()
+        types <- df1.num_mean %>%
+          select("ResourceType") %>%
+          arrange(.data$ResourceType) %>%
+          .$ResourceType %>%
+          unique() %>%
+          as.character()
+        names <- c(unlist(lapply(types, function(x) paste(x, values, sep = "_"))), "Time")
+        nnames <- length(names)
+        nvalues <- length(values)
+        ntypes <- length(types)
+        size <- nvalues * ntypes
+      
+        if (debug) {
+          print("ABE: Inicial metrics (v2)")
+          print(paste("values:", values))
+          print(paste("nvalues:", nvalues))    
+          print(paste("types:", types))
+          print(paste("ntypes:", ntypes))    
+          print(paste("names:", names))
+          print(paste("nnames:", nnames))
+          print(paste("size:", size))
+        }
+      
+        ############
+        # The three parts
+      
+        # Part 1
+        m.con1 <- cbind(do.call(cbind, replicate(ntypes, diag(1, nvalues, nvalues), simplify = FALSE)), rep(0, nvalues)) %>% set_colnames(names)
+        m.dir1 <- rep("=", nvalues)
+        m.rhs1 <- df1.num_mean %>%
+          group_by(.data$Value) %>%
+          summarize(Sum = sum(.data$Num)) %>%
+          arrange(.data$Value) %>%
+          .$Sum
+      
+        if (debug) {
+          print(m.con1)
+          print(m.dir1)
+          print(m.rhs1)
+          print("End of Part 1")
+        }
+      
+        # Part 2
+        m <- df1.num_mean %>%
+          arrange(.data$ResourceType, .data$Value) %>%
+          pivot_wider(
+            id_cols = "ResourceType", names_from = "Value", values_from = "Mean",
+            names_sort = TRUE, values_fill = 1e10
+          ) %>%
+          select(-"ResourceType") %>%
+          set_colnames(NULL) %>%
+          as.matrix()
+        M <- matrix(data = rep(0, ntypes * (nnames - 1)), nrow = ntypes)
+        for (i in 1:ntypes) { # for each ResourceType
+          for (j in 1:nvalues) { # for each Kernel
+            M[i, nvalues * (i - 1) + j] <- m[i, j]
+          }
+        }
+        m.con2 <- cbind(M, df1.res_quantity %>%
+          arrange(.data$ResourceType) %>%
+          mutate(Quantity = as.numeric(.data$Quantity) * -1) %>% .$Quantity) # %>% set_colnames(names);
+        m.dir2 <- rep("<=", length(types))
+        m.rhs2 <- rep(0, length(types))
+      
+        if (debug) {
+          print(m.con2)
+          print(m.dir2)
+          print(m.rhs2)
+          print("End of Part 2")
+        }
+      
+        # Part 3
+        m.con3 <- cbind(diag(1, size), rep(0, size)) # %>% set_colnames(names);
+        m.dir3 <- rep(">=", size)
+        m.rhs3 <- rep(0, size)
+      
+        if (debug) {
+          print(m.con3)
+          print(m.dir3)
+          print(m.rhs3)
+          print("End of Part 3")
+        }
+      
+        ##########
+        # Final + objective function
+      
+        # Row bind and concatenate everything:
+        m.con <- rbind(m.con1, m.con2, m.con3)
+        m.dir <- c(m.dir1, m.dir2, m.dir3)
+        m.rhs <- c(m.rhs1, m.rhs2, m.rhs3)
+      
+        # Define the objective function
+        f.obj <- c(rep(0, length(values) * length(types)), 1)
+      
+        # Call lp
+        result <- lpSolve::lp("min", f.obj, m.con, m.dir, m.rhs)
+        return(tibble(Result = list(result), Values = list(values), Types = list(types)))
+      }
+
+
+  tibble(DIR = dir_ls("trace/xeon/default")) |>
+  mutate(cpu = 'Xeon', config = 'default') |>
+  mutate(Function = ifelse(grepl("potrf", DIR), "dpotrf", "dgetrf_nopiv")) |>
+  mutate(gpus = ifelse((grepl("potrf_1", DIR) | grepl("nopiv_1", DIR)), 1, 0)) |>
+  mutate(STARVZ = map(DIR, starvz_read, selective=FALSE)) |>
+  mutate(abe = map_dbl(STARVZ, function(svz) { abe_cpu_cuda(svz$Application)$Result })) |>
+  mutate(makespan = map_dbl(STARVZ, function(svz) { max(svz$Application$End) })) -> xeon_default
+
+  tibble(DIR = dir_ls("trace/xeon/optimal")) |>
+  mutate(cpu = 'Xeon', config = 'optimal') |>
+  mutate(Function = ifelse(grepl("potrf", DIR), "dpotrf", "dgetrf_nopiv")) |>
+  mutate(gpus = ifelse((grepl("potrf_1", DIR) | grepl("nopiv_1", DIR)), 1, 0)) |>
+  mutate(STARVZ = map(DIR, starvz_read, selective=FALSE)) |>
+  mutate(abe = map_dbl(STARVZ, function(svz) { abe_cpu_cuda(svz$Application)$Result })) |>
+  mutate(makespan = map_dbl(STARVZ, function(svz) { max(svz$Application$End) })) -> xeon_optimal
+
+  tibble(DIR = dir_ls("trace/i7/default")) |>
+  mutate(cpu = 'i7', config = 'default') |>
+  mutate(Function = ifelse(grepl("potrf", DIR), "dpotrf", "dgetrf_nopiv")) |>
+  mutate(gpus = ifelse((grepl("potrf_1", DIR) | grepl("nopiv_1", DIR)), 1, 0)) |>
+  mutate(STARVZ = map(DIR, starvz_read, selective=FALSE)) |>
+  mutate(abe = map_dbl(STARVZ, function(svz) { abe_cpu_cuda(svz$Application)$Result })) |>
+  mutate(makespan = map_dbl(STARVZ, function(svz) { max(svz$Application$End) })) -> i7_default
+
+  tibble(DIR = dir_ls("trace/i7/optimal")) |>
+  mutate(cpu = 'i7', config = 'optimal') |>
+  mutate(Function = ifelse(grepl("potrf", DIR), "dpotrf", "dgetrf_nopiv")) |>
+  mutate(gpus = ifelse((grepl("potrf_1", DIR) | grepl("nopiv_1", DIR)), 1, 0)) |>
+  mutate(STARVZ = map(DIR, starvz_read, selective=FALSE)) |>
+  mutate(abe = map_dbl(STARVZ, function(svz) { abe_cpu_cuda(svz$Application)$Result })) |>
+  mutate(makespan = map_dbl(STARVZ, function(svz) { max(svz$Application$End) })) -> i7_optimal
+
+  tibble(DIR = dir_ls("trace/i9/default")) |>
+  mutate(cpu = 'i9', config = 'default') |>
+  mutate(Function = ifelse(grepl("potrf", DIR), "dpotrf", "dgetrf_nopiv")) |>
+  mutate(gpus = ifelse((grepl("potrf_1", DIR) | grepl("nopiv_1", DIR)), 1, 0)) |>
+  mutate(STARVZ = map(DIR, starvz_read, selective=FALSE)) |>
+  mutate(abe = map_dbl(STARVZ, function(svz) { abe_cpu_cuda(svz$Application)$Result })) |>
+  mutate(makespan = map_dbl(STARVZ, function(svz) { max(svz$Application$End) })) -> i9_default
+
+  tibble(DIR = dir_ls("trace/i9/optimal")) |>
+  mutate(cpu = 'i9', config = 'optimal') |>
+  mutate(Function = ifelse(grepl("potrf", DIR), "dpotrf", "dgetrf_nopiv")) |>
+  mutate(gpus = ifelse((grepl("potrf_1", DIR) | grepl("nopiv_1", DIR)), 1, 0)) |>
+  mutate(STARVZ = map(DIR, starvz_read, selective=FALSE)) |>
+  mutate(abe = map_dbl(STARVZ, function(svz) { abe_cpu_cuda(svz$Application)$Result })) |>
+  mutate(makespan = map_dbl(STARVZ, function(svz) { max(svz$Application$End) })) -> i9_optimal
+
+df <- bind_rows(xeon_default, xeon_optimal, i7_default, i7_optimal, i9_default, i9_optimal) |> select (Function, cpu, config, gpus, abe, makespan)
+df |> 
+  group_by(Function, cpu, config, gpus) |> 
+  summarise(mean_abe = mean(abe), mean_makespan = mean(makespan), ratio = mean(abe)/mean(makespan)) |>
+  write.csv(df_final, "./drawing/abe.csv")
+#+end_src
+* Final analysis (Performance, Energy Consumption and GFLOPS x J)
+The final analysis includes the output from the experiments and data logged by nvidia-smi. We start by parsing these files separately via bash and merge all of them with R.
+
+#+begin_src bash
+# cpu
+
+echo "Function;threads;gpus;time;gflops;energy_before;energy_after" > csvs/final_gpu_xeon.csv
+cat xeon_final_gpu.ou | grep -e "getrf_nopiv;" -e "potrf;" -A 1 | grep -e ";" | paste -d "" - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,14,15,16,17 >> final_gpu_xeon.csv
+
+echo "Function;threads;gpus;time;gflops;config;energy_before;energy_after" > csvs/final_gpu_i7.csv
+cat i7_final_gpu.ou | grep -e "getrf_nopiv;" -e "potrf;" -A 1 | grep -e ";" | paste -d "" - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,14,15,16,17,18 >> final_gpu_i7.csv
+
+echo "Function;threads;gpus;time;gflops;config;energy_before;energy_after" > csvs/final_gpu_i9.csv
+cat i9_final_gpu.ou | grep -e "getrf_nopiv;" -e "potrf;" -A 1 | grep -e ";" | paste -d "" - - | sed 's/3.276800e+04;//g' | cut -d ';' -f2,3,4,14,15,16,17,18 >> final_gpu_i9.csv
+
+# gpu
+cat logs_nvidia/xeon.log | sed -E "s/.*acabou/\nacabou/g" | sed '/^[[:space:]]*$/d' | sed 's/acabou/-1/g' | sed 's/ W//g' > parsed_xeon.csv
+cat logs_nvidia/i7.log | sed -E "s/.*acabou/\nacabou/g" | sed '/^[[:space:]]*$/d' | sed 's/acabou/-1/g' | sed 's/ W//g' > parsed_i7.csv
+cat logs_nvidia/i9.log | sed -E "s/.*acabou/\nacabou/g" | sed '/^[[:space:]]*$/d' | sed 's/acabou/-1/g' | sed 's/ W//g' > parsed_i9.csv
+#+end_src
+
+#+begin_src R
+library(tidyverse)
+
+# xeon
+xeon <- read.csv("csvs/final_gpu_xeon.csv",sep=";")
+
+gpu <- read.csv("logs_nvidia/parsed_xeon.csv")
+gpu$time <- strptime(gpu$timestamp, format="%Y/%m/%d %H:%M:%OS")
+
+gpu |>
+    mutate(Muda = ifelse(timestamp != -1, 0, 1)) |>
+    mutate(Experimento = cumsum(Muda)) |> # define o identificador do experimento
+    filter(timestamp != -1) |>
+    mutate(delta_t=time-lag(time)) |>
+    mutate(gpu_energy=delta_t*power.draw..W.) |>
+    na.omit() |>
+    group_by(Experimento) |>
+    filter(n() != 1) |> # remover o experimento 45
+    summarize(E = sum(gpu_energy), .groups="keep") -> gpu_df
+gpu_df$gpu_consumption <- as.numeric(gpu_df$E)
+
+xeon$energy_gpu <- gpu_df$gpu_consumption
+xeon$cpu <- 'Xeon'
+xeon$config <- 'All Cores'
+
+# i7
+i7 <- read.csv("csvs/final_gpu_i7.csv",sep=";")
+
+gpu <- read.csv("logs_nvidia/parsed_i7.csv")
+gpu$time <- strptime(gpu$timestamp, format="%Y/%m/%d %H:%M:%OS")
+
+gpu |>
+    mutate(Muda = ifelse(timestamp != -1, 0, 1)) |>
+    mutate(Experimento = cumsum(Muda)) |> # define o identificador do experimento
+    filter(timestamp != -1) |>
+    mutate(delta_t=time-lag(time)) |>
+    mutate(gpu_energy=delta_t*power.draw..W.) |>
+    na.omit() |>
+    group_by(Experimento) |>
+    filter(n() != 1) |> # remover o experimento 45
+    summarize(E = sum(gpu_energy), .groups="keep") -> gpu_df
+gpu_df$gpu_consumption <- as.numeric(gpu_df$E)
+
+i7$energy_gpu <- gpu_df$gpu_consumption
+i7$cpu <- 'i7'
+
+# i9
+i9 <- read.csv("csvs/final_gpu_i9.csv",sep=";")
+
+gpu <- read.csv("logs_nvidia/parsed_i9.csv")
+gpu$time <- strptime(gpu$timestamp, format="%Y/%m/%d %H:%M:%OS")
+
+gpu |>
+    mutate(Muda = ifelse(timestamp != -1, 0, 1)) |>
+    mutate(Experimento = cumsum(Muda)) |> # define o identificador do experimento
+    filter(timestamp != -1) |>
+    mutate(delta_t=time-lag(time)) |>
+    mutate(gpu_energy=delta_t*power.draw..W.) |>
+    na.omit() |>
+    group_by(Experimento) |>
+    filter(n() != 1) |> # remover o experimento 45
+    summarize(E = sum(gpu_energy), .groups="keep") -> gpu_df
+gpu_df$gpu_consumption <- as.numeric(gpu_df$E)
+
+i9$energy_gpu <- gpu_df$gpu_consumption
+i9$cpu <- 'i9'
+
+df <- bind_rows(xeon, i7, i9)
+
+# energy consumption depends on the max_energy_uj_range file which is 262143328850 for the 3 cpus
+# calculate energy consumption
+max_energy <- 262143328850
+df$energy_spent = ifelse(df$energy_after > df$energy_before, df$energy_after - df$energy_before, df$energy_after + max_energy - df$energy_before)
+df$energy_spent <- df$energy_spent/10e6
+
+write.csv(df, "final_gpu_complete.csv")
+#+end_src
